@@ -13,6 +13,7 @@ struct BoostRelayDataEntry {
     proposer_fee_recipient: Address,
     #[serde(deserialize_with = "deserialize_u256_from_decimal")]
     value: U256,
+    block_hash: H256,
     block_number: u64,
 }
 
@@ -135,6 +136,7 @@ async fn get_block_proposer_payment_data(
     block_numer: u64,
     fee_recipient: Address,
     bid_value: U256,
+    block_hash: Option<H256>,
 ) -> eyre::Result<BlockProposerPaymentData> {
     let transfers = {
         let trace = provider
@@ -150,6 +152,13 @@ async fn get_block_proposer_payment_data(
             .get_block_with_txs(block_numer)
             .await?
             .ok_or_else(|| eyre::eyre!("block not found"))?;
+
+        if block_hash.is_some() {
+            if block_hash != block.hash {
+                return Err(eyre::eyre!("block hash mismatch"));
+            }
+        }
+
         let withdrawals = {
             let mut withdrawals = block.withdrawals.unwrap_or_default();
             withdrawals.retain(|w| w.address == fee_recipient);
@@ -254,6 +263,7 @@ async fn process_input_entry(
         input.block_number,
         input.proposer_fee_recipient,
         input.value,
+        Some(input.block_hash),
     )
     .await?;
     Ok(OutputFileEntry {
@@ -299,8 +309,9 @@ async fn main() -> eyre::Result<()> {
             bid_value,
         } => {
             let bid_value = U256::from_dec_str(&bid_value)?;
-            let data = get_block_proposer_payment_data(&provider, number, fee_recipient, bid_value)
-                .await?;
+            let data =
+                get_block_proposer_payment_data(&provider, number, fee_recipient, bid_value, None)
+                    .await?;
             println!("{:#?}", data);
         }
         Command::File { input, output } => {
