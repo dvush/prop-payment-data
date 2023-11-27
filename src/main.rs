@@ -155,7 +155,7 @@ async fn get_block_proposer_payment_data(
 
         if block_hash.is_some() {
             if block_hash != block.hash {
-                return Err(eyre::eyre!("block hash mismatch"));
+                return Err(eyre::eyre!("block hash mismatch, possible reorg"));
             }
         }
 
